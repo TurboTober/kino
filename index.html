@@ -4,11 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cinema Seat Management</title>
+    <title>Local Seat Manager</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PDF Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
     <style>
         /* Custom screen shape */
         .cinema-screen {
@@ -55,6 +60,14 @@
         .group-scroll::-webkit-scrollbar-track {
             background: transparent;
         }
+
+        /* Checkbox custom style */
+        .card-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #e94560;
+        }
     </style>
     <script>
         tailwind.config = {
@@ -66,6 +79,8 @@
                 }
             }
         }
+        // PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
 </head>
 
@@ -78,18 +93,30 @@
                 <i class="fas fa-arrow-left text-xl"></i>
             </button>
             <h1 class="text-xl font-bold flex items-center gap-2 select-none" id="appTitle">
-                <i class="fas fa-film text-red-500"></i>
-                <span>Cinema<span class="text-red-500">Mgr</span></span>
+                <span>Local Seat Manager</span>
             </h1>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+            <!-- Dashboard Actions -->
+            <div id="dashboardActions" class="hidden flex gap-2">
+                <button onclick="document.getElementById('pdfImportInput').click()"
+                    class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold transition flex items-center gap-2 shadow-md"
+                    title="Import PDF">
+                    <i class="fas fa-file-import"></i> <span class="hidden sm:inline">Import PDF</span>
+                </button>
+                <input type="file" id="pdfImportInput" class="hidden" accept="application/pdf"
+                    onchange="handlePdfImport(this)">
+
+                <button id="createCinemaBtn"
+                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-full text-sm font-semibold transition flex items-center gap-2 shadow-md">
+                    <i class="fas fa-plus"></i> <span class="hidden sm:inline">New Hall</span>
+                </button>
+            </div>
+
+            <!-- Cinema View Actions -->
             <button id="shareBtn"
                 class="hidden bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full text-sm font-semibold transition flex items-center gap-2 shadow-md">
                 <i class="fas fa-share-nodes"></i> <span class="hidden sm:inline">Share</span>
-            </button>
-            <button id="createCinemaBtn"
-                class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-full text-sm font-semibold transition flex items-center gap-2 shadow-md">
-                <i class="fas fa-plus"></i> <span class="hidden sm:inline">New Cinema</span>
             </button>
         </div>
     </header>
@@ -98,14 +125,30 @@
     <main class="flex-grow container mx-auto p-4 flex flex-col h-[calc(100vh-4rem)]">
 
         <!-- DASHBOARD VIEW -->
-        <div id="dashboardView" class="w-full max-w-2xl mx-auto flex flex-col gap-4">
-            <h2 class="text-2xl font-bold mb-2 text-gray-300">Your Cinemas</h2>
-            <div id="cinemaList" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div id="dashboardView" class="w-full max-w-4xl mx-auto flex flex-col gap-4">
+
+            <!-- Selection Toolbar -->
+            <div id="selectionToolbar"
+                class="hidden sticky top-2 z-10 bg-gray-800 p-3 rounded-lg shadow-xl flex justify-between items-center animate-pulse border border-red-500/50">
+                <span class="font-bold text-sm ml-2"><span id="selectedCount">0</span> Selected</span>
+                <div class="flex gap-2">
+                    <button onclick="exportSelectedPDF()"
+                        class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm font-bold shadow-sm">
+                        <i class="fas fa-file-pdf"></i> Export PDF
+                    </button>
+                    <button onclick="deleteSelected()"
+                        class="bg-gray-700 hover:text-red-500 text-gray-300 px-3 py-1 rounded text-sm font-bold shadow-sm">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="cinemaList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
                 <!-- Cinema Cards Injected Here -->
             </div>
             <div id="emptyState" class="hidden text-center text-gray-500 mt-10">
                 <i class="fas fa-film text-6xl mb-4 opacity-30"></i>
-                <p>No cinemas found. Create one to get started!</p>
+                <p>No halls found. Create one or import a PDF!</p>
             </div>
         </div>
 
@@ -115,7 +158,7 @@
             <!-- Toolbar (Groups) -->
             <div class="bg-gray-800 p-2 rounded-lg shadow-lg mb-4 flex flex-col gap-2 shrink-0">
                 <div class="flex justify-between items-center px-1">
-                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Reservation Groups</span>
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Groups</span>
                     <button onclick="openGroupModal()"
                         class="text-xs text-blue-400 hover:text-blue-300 font-bold px-2 py-1 bg-blue-400/10 rounded">
                         <i class="fas fa-plus"></i> NEW GROUP
@@ -129,7 +172,6 @@
                         <i class="fas fa-eraser text-gray-400"></i>
                         <div class="flex flex-col items-start leading-none">
                             <span class="text-sm font-bold">Clear</span>
-                            <span class="text-[10px] text-gray-500">Available</span>
                         </div>
                     </button>
                     <!-- Groups injected here -->
@@ -140,7 +182,7 @@
             <div class="flex-grow overflow-auto bg-gray-900/50 rounded-lg p-4 border border-gray-800 relative">
                 <div class="cinema-screen"></div>
                 <div class="flex justify-center min-w-max">
-                    <div id="seatGrid" class="grid gap-2 mb-8">
+                    <div id="seatGrid" class="grid gap-2 mb-8 auto-rows-min">
                         <!-- Seats injected here -->
                     </div>
                 </div>
@@ -158,10 +200,10 @@
         class="modal opacity-0 pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeModal('createCinemaModal')"></div>
         <div class="relative bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl p-6 transform transition-all scale-95">
-            <h3 class="text-xl font-bold mb-4">Create New Cinema</h3>
+            <h3 class="text-xl font-bold mb-4">Create New Hall</h3>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-xs uppercase text-gray-400 font-bold mb-1">Cinema Name</label>
+                    <label class="block text-xs uppercase text-gray-400 font-bold mb-1">Hall Name</label>
                     <input type="text" id="newCinemaName"
                         class="w-full bg-gray-700 rounded p-2 focus:ring-2 focus:ring-red-500 outline-none"
                         placeholder="e.g. Hall 1">
@@ -195,14 +237,14 @@
         class="modal opacity-0 pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeModal('renameCinemaModal')"></div>
         <div class="relative bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl p-6 transform transition-all scale-95">
-            <h3 class="text-xl font-bold mb-4">Rename Cinema</h3>
+            <h3 class="text-xl font-bold mb-4">Rename Hall</h3>
             <div class="space-y-4">
                 <input type="hidden" id="renameCinemaId">
                 <div>
                     <label class="block text-xs uppercase text-gray-400 font-bold mb-1">New Name</label>
                     <input type="text" id="renameCinemaName"
                         class="w-full bg-gray-700 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                        placeholder="Cinema Name">
+                        placeholder="Hall Name">
                 </div>
             </div>
             <div class="mt-6 flex justify-end gap-2">
@@ -230,7 +272,6 @@
                 <div>
                     <label class="block text-xs uppercase text-gray-400 font-bold mb-1">Color</label>
                     <div class="flex gap-2 flex-wrap">
-                        <!-- Color Pickers -->
                         <button onclick="selectColor('#ef4444')"
                             class="w-8 h-8 rounded-full bg-red-500 ring-2 ring-transparent hover:ring-white color-opt"
                             data-color="#ef4444"></button>
@@ -267,49 +308,27 @@
         </div>
     </div>
 
-    <!-- Import Modal -->
-    <div id="importModal"
-        class="modal opacity-0 pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
-        <div
-            class="relative bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl p-6 transform transition-all scale-95 text-center">
-            <i class="fas fa-file-import text-4xl text-blue-500 mb-4"></i>
-            <h3 class="text-xl font-bold mb-2">Import Cinema?</h3>
-            <p class="text-gray-400 mb-6 text-sm">You are loading a shared cinema layout: <br><span id="importName"
-                    class="text-white font-bold"></span></p>
-            <div class="flex justify-center gap-3">
-                <button
-                    onclick="window.history.replaceState({}, document.title, window.location.pathname); closeModal('importModal');"
-                    class="px-4 py-2 text-gray-400 hover:text-white">Ignore</button>
-                <button onclick="confirmImport()"
-                    class="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 font-bold">Import</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Toast Notification -->
     <div id="toast"
         class="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 border-l-4 border-green-500 text-white px-6 py-3 rounded shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50 flex items-center gap-3">
         <i class="fas fa-check-circle text-green-500"></i>
-        <span id="toastMsg">Link copied to clipboard!</span>
+        <span id="toastMsg">Action Successful</span>
     </div>
 
     <script>
         /**
          * Schema Reference:
          * Cinema: { id: string, name: string, rows: number, cols: number, groups: Group[], seats: Seat[] }
-         * Group: { id: string, name: string, color: string }
-         * Seat: { row: number, col: number, status: 'available'|'reserved', groupId: string|null, guestName: string }
          */
 
         const STORAGE_KEY = 'cinemaMgr_v2';
-        const OLD_STORAGE_KEY = 'cinemaSeats_v1';
 
         // --- State ---
         let cinemas = [];
         let currentCinemaId = null;
-        let pendedImport = null; // Stores cinema data waiting to be imported
-        let currentTool = 'eraser'; // 'eraser' or groupId
+        let pendedImport = null;
+        let currentTool = 'eraser';
+        let selectedCinemaIds = new Set(); // For dashboard multi-select
 
         // --- DOM Elements ---
         const views = {
@@ -320,11 +339,14 @@
             backBtn: document.getElementById('backBtn'),
             shareBtn: document.getElementById('shareBtn'),
             createCinemaBtn: document.getElementById('createCinemaBtn'),
+            dashboardActions: document.getElementById('dashboardActions'),
             appTitle: document.getElementById('appTitle'),
             cinemaList: document.getElementById('cinemaList'),
             emptyState: document.getElementById('emptyState'),
             seatGrid: document.getElementById('seatGrid'),
             groupToolbar: document.getElementById('groupToolbar'),
+            selectionToolbar: document.getElementById('selectionToolbar'),
+            selectedCount: document.getElementById('selectedCount'),
             toast: document.getElementById('toast'),
             toastMsg: document.getElementById('toastMsg')
         };
@@ -333,22 +355,13 @@
         function init() {
             loadData();
 
-            // Check for migration
-            const oldData = localStorage.getItem(OLD_STORAGE_KEY);
-            if (oldData && cinemas.length === 0) {
-                migrateOldData(oldData);
-            }
-
-            // Check URL
+            // Check URL share
             const urlParams = new URLSearchParams(window.location.search);
             const shareData = urlParams.get('data');
             if (shareData) {
                 try {
                     const json = JSON.parse(decodeURIComponent(escape(atob(shareData))));
-                    pendedImport = json;
-                    // Show Import Modal
-                    document.getElementById('importName').innerText = pendedImport.name || "Shared Cinema";
-                    openModal('importModal');
+                    handleExternalImport(json);
                 } catch (e) {
                     console.error("Import failed", e);
                     showToast("Invalid share link", true);
@@ -373,43 +386,15 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(cinemas));
         }
 
-        function migrateOldData(jsonStr) {
-            try {
-                const oldSeats = JSON.parse(jsonStr);
-                // Assume 6x8 from v1
-                const newCinema = {
-                    id: crypto.randomUUID(),
-                    name: "Legacy Cinema",
-                    rows: 6,
-                    cols: 8,
-                    groups: [{ id: 'g_default', name: 'Standard', color: '#ef4444' }],
-                    seats: oldSeats.map(s => ({
-                        row: s.row,
-                        col: s.col,
-                        status: s.status,
-                        groupId: s.status === 'reserved' ? 'g_default' : null,
-                        guestName: s.guestName
-                    }))
-                };
-                cinemas.push(newCinema);
+        function handleExternalImport(cinemaData) {
+            // Check if already exists? Nah, just prompt or auto-add as copy
+            if (confirm(`Import cinema "${cinemaData.name}"?`)) {
+                cinemaData.id = crypto.randomUUID();
+                cinemaData.name = cinemaData.name + " (Imported)";
+                cinemas.push(cinemaData);
                 saveData();
-                localStorage.removeItem(OLD_STORAGE_KEY); // Cleanup
-            } catch (e) {
-                console.error("Migration failed", e);
-            }
-        }
-
-        function confirmImport() {
-            if (pendedImport) {
-                // Regenerate ID to avoid conflicts if importing same cinema multiple times
-                pendedImport.id = crypto.randomUUID();
-                pendedImport.name = pendedImport.name + " (Imported)";
-                cinemas.push(pendedImport);
-                saveData();
-                closeModal('importModal');
+                showToast("Cinema Imported");
                 window.history.replaceState({}, document.title, window.location.pathname);
-                showToast("Cinema Imported Successfully");
-                render();
             }
         }
 
@@ -420,16 +405,18 @@
                 views.cinema.classList.add('hidden');
                 elements.backBtn.classList.add('hidden');
                 elements.shareBtn.classList.add('hidden');
-                elements.createCinemaBtn.classList.remove('hidden');
-                elements.appTitle.innerHTML = `<i class="fas fa-film text-red-500"></i><span>Cinema<span class="text-red-500">Mgr</span></span>`;
+                elements.dashboardActions.classList.remove('hidden');
+                elements.appTitle.innerText = "Local Seat Manager";
                 currentCinemaId = null;
+                selectedCinemaIds.clear();
+                updateSelectionToolbar();
             } else if (viewName === 'cinema') {
                 views.dashboard.classList.add('hidden');
                 views.cinema.classList.remove('hidden');
-                views.cinema.classList.add('flex'); // restore flex
+                views.cinema.classList.add('flex');
                 elements.backBtn.classList.remove('hidden');
                 elements.shareBtn.classList.remove('hidden');
-                elements.createCinemaBtn.classList.add('hidden');
+                elements.dashboardActions.classList.add('hidden');
 
                 const c = getCurrentCinema();
                 elements.appTitle.innerText = c.name;
@@ -465,125 +452,81 @@
                 const totalSeats = c.rows * c.cols;
 
                 const card = document.createElement('div');
-                card.className = 'bg-gray-800 p-4 rounded-xl shadow-md hover:ring-2 hover:ring-red-500 transition cursor-pointer relative group';
+                card.className = `bg-gray-800 p-4 rounded-xl shadow-md transition relative group border ${selectedCinemaIds.has(c.id) ? 'border-red-500' : 'border-transparent hover:border-gray-600'}`;
+
                 card.innerHTML = `
-                    <h3 class="font-bold text-lg mb-1">${c.name}</h3>
-                    <p class="text-gray-400 text-xs mb-3 flex items-center gap-2">
-                        <span><i class="fas fa-th"></i> ${c.rows}x${c.cols}</span>
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex gap-2 items-center">
+                            <input type="checkbox" class="card-checkbox" ${selectedCinemaIds.has(c.id) ? 'checked' : ''} onclick="toggleSelection(event, '${c.id}')">
+                            <h3 class="font-bold text-lg select-none cursor-pointer" onclick="openCinema('${c.id}')">${c.name}</h3>
+                        </div>
+                    </div>
+                    
+                    <p class="text-gray-400 text-xs mb-3 flex items-center gap-2 cursor-pointer" onclick="openCinema('${c.id}')">
+                        <span>${c.rows}x${c.cols}</span>
                         <span>&bull;</span>
-                        <span><i class="fas fa-users"></i> ${c.groups.length} Groups</span>
+                        <span>${c.groups.length} Groups</span>
                     </p>
-                    <div class="h-2 w-full bg-gray-700 rounded-full overflow-hidden mb-1">
+                    
+                    <div class="h-2 w-full bg-gray-700 rounded-full overflow-hidden mb-1 cursor-pointer" onclick="openCinema('${c.id}')">
                         <div class="h-full bg-gradient-to-r from-red-500 to-orange-500" style="width: ${(reservedCount / totalSeats) * 100}%"></div>
                     </div>
-                    <p class="text-[10px] text-gray-500 text-right">${reservedCount} / ${totalSeats} reserved</p>
                     
-                <div class="flex justify-end gap-3 mt-4 border-t border-gray-700 pt-3">
-                    <button onclick="openRenameModal(event, '${c.id}', '${c.name.replace(/'/g, "\\'")}')" class="text-gray-400 hover:text-white p-2" title="Rename">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button onclick="duplicateCinema(event, '${c.id}')" class="text-gray-400 hover:text-white p-2" title="Duplicate">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                    <button onclick="deleteCinema(event, '${c.id}')" class="text-gray-400 hover:text-red-500 p-2" title="Delete">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
+                    <!-- Actions -->
+                    <div class="flex justify-end gap-3 mt-4 border-t border-gray-700 pt-3 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <button onclick="openRenameModal(event, '${c.id}', '${c.name.replace(/'/g, "\\'")}')" class="text-gray-400 hover:text-white" title="Rename"><i class="fas fa-edit"></i></button>
+                        <button onclick="duplicateCinema(event, '${c.id}')" class="text-gray-400 hover:text-white" title="Duplicate"><i class="fas fa-copy"></i></button>
+                        <button onclick="deleteCinema(event, '${c.id}')" class="text-gray-400 hover:text-red-500" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
                 `;
-                card.onclick = (e) => {
-                    // Prevent click if clicking actions
-                    if (e.target.closest('button')) return;
-                    currentCinemaId = c.id;
-                    render();
-                };
                 elements.cinemaList.appendChild(card);
             });
+            updateSelectionToolbar();
         }
 
-        // --- Logic: Rename and Duplicate ---
-        function openRenameModal(event, id, currentName) {
-            event.stopPropagation();
-            document.getElementById('renameCinemaId').value = id;
-            document.getElementById('renameCinemaName').value = currentName;
-            openModal('renameCinemaModal');
+        function openCinema(id) {
+            currentCinemaId = id;
+            render();
         }
 
-        function submitRename() {
-            const id = document.getElementById('renameCinemaId').value;
-            const newName = document.getElementById('renameCinemaName').value.trim();
+        function toggleSelection(e, id) {
+            e.stopPropagation();
+            if (selectedCinemaIds.has(id)) {
+                selectedCinemaIds.delete(id);
+            } else {
+                selectedCinemaIds.add(id);
+            }
+            renderDashboard(); // Re-render to show border state
+        }
 
-            if (newName) {
-                const cinema = cinemas.find(c => c.id === id);
-                if (cinema) {
-                    cinema.name = newName;
-                    saveData();
-                    render();
-                    closeModal('renameCinemaModal');
-                    showToast("Cinema renamed");
-                }
+        function updateSelectionToolbar() {
+            if (selectedCinemaIds.size > 0) {
+                elements.selectionToolbar.classList.remove('hidden');
+                elements.selectedCount.innerText = selectedCinemaIds.size;
+            } else {
+                elements.selectionToolbar.classList.add('hidden');
             }
         }
 
-        function duplicateCinema(event, id) {
-            event.stopPropagation();
-            const original = cinemas.find(c => c.id === id);
-            if (original) {
-                // Deep copy
-                const copy = JSON.parse(JSON.stringify(original));
-                copy.id = crypto.randomUUID();
-                copy.name = original.name + " (Copy)";
-                // Regenerate group IDs to avoid linking them? 
-                // Actually, if we deep copy, the group IDs are cloned. 
-                // If we want them independent, we should regenerate.
-                // But seats reference group IDs. So if we regen group IDs, we must update seats.
-
-                // Let's regen group IDs for cleanliness so they are truly independent entities.
-                const groupIdMap = {};
-                copy.groups.forEach(g => {
-                    const oldId = g.id;
-                    const newId = crypto.randomUUID();
-                    groupIdMap[oldId] = newId;
-                    g.id = newId;
-                });
-
-                // Update seats
-                copy.seats.forEach(s => {
-                    if (s.groupId && groupIdMap[s.groupId]) {
-                        s.groupId = groupIdMap[s.groupId];
-                    }
-                });
-
-                cinemas.push(copy);
-                saveData();
-                render();
-                showToast("Cinema duplicated");
-            }
-        }
-
+        // --- Cinema View Rendering ---
         function renderCinemaView() {
             const c = getCurrentCinema();
-            if (!c) return; // Error handling
+            if (!c) return;
 
-            // 1. Render Toolbar
-            // Clear existing non-eraser buttons
+            // 1. Toolbar
             const tools = elements.groupToolbar.querySelectorAll('button:not(#tool-eraser)');
             tools.forEach(t => t.remove());
 
-            // Helper to create tool button
             c.groups.forEach(g => {
                 const count = c.seats.filter(s => s.groupId === g.id && s.status === 'reserved').length;
                 const btn = document.createElement('button');
                 btn.className = `flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-gray-600 bg-gray-700/50 hover:bg-gray-700 transition shrink-0 group-tool min-w-[100px] justify-between ${currentTool === g.id ? 'ring-2 ring-white border-transparent' : 'opacity-70 hover:opacity-100'}`;
-                // Set color of border/indicator based on group color
                 btn.style.borderColor = currentTool === g.id ? 'white' : g.color;
 
                 btn.innerHTML = `
                     <div class="flex items-center gap-2">
                         <div class="w-3 h-3 rounded-full shadow-sm" style="background-color: ${g.color}"></div>
-                        <div class="flex flex-col items-start leading-none">
-                            <span class="text-sm font-bold truncate max-w-[80px]">${g.name}</span>
-                            <span class="text-[10px] text-gray-400">Reserved</span>
-                        </div>
+                        <span class="text-sm font-bold truncate max-w-[80px]">${g.name}</span>
                     </div>
                     <span class="text-xs font-mono bg-gray-900 px-1.5 py-0.5 rounded text-gray-300 ml-2">${count}</span>
                 `;
@@ -591,7 +534,6 @@
                 elements.groupToolbar.appendChild(btn);
             });
 
-            // Update Eraser styling
             const eraserBtn = document.getElementById('tool-eraser');
             if (currentTool === 'eraser') {
                 eraserBtn.classList.add('ring-2', 'ring-white', 'opacity-100');
@@ -601,63 +543,65 @@
                 eraserBtn.classList.add('opacity-70');
             }
 
-
-            // 2. Render Grid
+            // 2. Grid with Numbering
             elements.seatGrid.innerHTML = '';
-            // Set dynamic columns
-            elements.seatGrid.style.gridTemplateColumns = `repeat(${c.cols}, minmax(0, 1fr))`;
+            // Add extra column for row labels
+            elements.seatGrid.style.gridTemplateColumns = `auto repeat(${c.cols}, minmax(0, 1fr))`;
 
-            c.seats.forEach((seat, idx) => {
-                const btn = document.createElement('button');
-                // Basic styles
-                let classes = "w-8 h-8 sm:w-10 sm:h-10 rounded md:rounded-lg flex items-center justify-center text-sm transition transform active:scale-90 focus:outline-none ";
+            for (let r = 0; r < c.rows; r++) {
+                // Row Label
+                const label = document.createElement('div');
+                label.className = "flex items-center justify-center font-bold text-gray-500 text-xs sm:text-sm pr-2";
+                label.innerText = r + 1;
+                elements.seatGrid.appendChild(label);
 
-                if (seat.status === 'available') {
-                    classes += "bg-gray-700 text-gray-500 hover:bg-gray-600 hover:text-gray-300";
-                    btn.innerHTML = `<i class="fas fa-couch"></i>`;
-                } else {
-                    // Reserved
-                    const group = c.groups.find(g => g.id === seat.groupId);
-                    const color = group ? group.color : '#ef4444'; // fallback
-                    // We need to apply this color dynamically
-                    btn.style.backgroundColor = `${color}33`; // 20% opacity using hex alpha
-                    btn.style.color = color;
-                    btn.style.border = `1px solid ${color}88`;
-                    btn.innerHTML = `<i class="fas fa-couch"></i>`;
+                for (let col = 0; col < c.cols; col++) {
+                    // Find seat
+                    const seatIndex = r * c.cols + col; // Assuming linear array
+                    // Check if seat array is linear or we need to find by row/col
+                    // My previous implementation was linear but ordered.
+                    const seat = c.seats.find(s => s.row === r && s.col === col);
+
+                    const btn = document.createElement('button');
+                    let classes = "w-8 h-8 sm:w-10 sm:h-10 rounded md:rounded-lg flex items-center justify-center text-xs sm:text-sm font-bold transition transform active:scale-95 focus:outline-none relative ";
+
+                    if (seat.status === 'available') {
+                        classes += "bg-gray-700 text-gray-500 hover:bg-gray-600 hover:text-gray-300";
+                    } else {
+                        const group = c.groups.find(g => g.id === seat.groupId);
+                        const color = group ? group.color : '#ef4444';
+                        btn.style.backgroundColor = `${color}33`;
+                        btn.style.color = color;
+                        btn.style.border = `1px solid ${color}`;
+                    }
+
+                    btn.className = classes;
+                    btn.innerText = col + 1; // Seat Number
+                    btn.onclick = () => handleSeatInteract(seat);
+                    elements.seatGrid.appendChild(btn);
                 }
-
-                btn.className = classes;
-                btn.onclick = () => handleSeatInteract(idx);
-                elements.seatGrid.appendChild(btn);
-            });
+            }
         }
 
-        // --- Logic: Tools & Interaction ---
+        // --- Interaction Logic ---
         function selectTool(toolId) {
             currentTool = toolId;
-            renderCinemaView(); // Re-render toolbar to update active state
+            renderCinemaView();
         }
 
-        function handleSeatInteract(index) {
-            const c = getCurrentCinema();
-            const seat = c.seats[index];
-
+        function handleSeatInteract(seat) {
             if (currentTool === 'eraser') {
                 if (seat.status !== 'available') {
                     seat.status = 'available';
                     seat.groupId = null;
-                    seat.guestName = '';
                     saveData();
                     renderCinemaView();
                 }
             } else {
-                // Must be a valid group ID
+                const c = getCurrentCinema();
                 const group = c.groups.find(g => g.id === currentTool);
                 if (!group) return;
 
-                // If already reserved by this group, do nothing? Or maybe toggle?
-                // UX: Painting is usually additive. 
-                // If it's different, overwrite. If same, do nothing.
                 if (seat.status === 'available' || seat.groupId !== currentTool) {
                     seat.status = 'reserved';
                     seat.groupId = currentTool;
@@ -667,15 +611,14 @@
             }
         }
 
-        // --- Logic: Create Cinema ---
+        // --- CRUD Logic ---
         elements.createCinemaBtn.onclick = () => openModal('createCinemaModal');
 
         function submitNewCinema() {
-            const name = document.getElementById('newCinemaName').value.trim() || 'New Cinema';
+            const name = document.getElementById('newCinemaName').value.trim() || 'New Hall';
             let rows = parseInt(document.getElementById('newCinemaRows').value) || 6;
             let cols = parseInt(document.getElementById('newCinemaCols').value) || 8;
 
-            // Generate seats
             const seats = [];
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
@@ -688,132 +631,298 @@
                 name: name,
                 rows: rows,
                 cols: cols,
-                groups: [
-                    { id: crypto.randomUUID(), name: 'General', color: '#ef4444' } // Default group
-                ],
+                groups: [{ id: crypto.randomUUID(), name: 'General', color: '#ef4444' }],
                 seats: seats
             };
 
             cinemas.push(newCinema);
             saveData();
             closeModal('createCinemaModal');
-
-            // Reset input
             document.getElementById('newCinemaName').value = '';
 
             // Go to it
             currentCinemaId = newCinema.id;
-            currentTool = newCinema.groups[0].id; // Select default group
+            currentTool = newCinema.groups[0].id;
             render();
+        }
+
+        function duplicateCinema(event, id) {
+            event.stopPropagation();
+            const original = cinemas.find(c => c.id === id);
+            if (original) {
+                const copy = JSON.parse(JSON.stringify(original));
+                copy.id = crypto.randomUUID();
+                copy.name = original.name + " (Copy)";
+                // Regen Groups
+                const groupIdMap = {};
+                copy.groups.forEach(g => {
+                    const oldId = g.id;
+                    const newId = crypto.randomUUID();
+                    groupIdMap[oldId] = newId;
+                    g.id = newId;
+                });
+                copy.seats.forEach(s => {
+                    if (s.groupId && groupIdMap[s.groupId]) s.groupId = groupIdMap[s.groupId];
+                });
+
+                cinemas.push(copy);
+                saveData();
+                render();
+                showToast("Hall Copied");
+            }
+        }
+
+        function openRenameModal(event, id, currentName) {
+            event.stopPropagation();
+            document.getElementById('renameCinemaId').value = id;
+            document.getElementById('renameCinemaName').value = currentName;
+            openModal('renameCinemaModal');
+        }
+
+        function submitRename() {
+            const id = document.getElementById('renameCinemaId').value;
+            const newName = document.getElementById('renameCinemaName').value.trim();
+            if (newName) {
+                const cinema = cinemas.find(c => c.id === id);
+                if (cinema) {
+                    cinema.name = newName;
+                    saveData();
+                    render();
+                    closeModal('renameCinemaModal');
+                    showToast("Renamed");
+                }
+            }
         }
 
         function deleteCinema(event, id) {
             event.stopPropagation();
-            if (confirm("Are you sure you want to delete this cinema? This cannot be undone.")) {
+            if (confirm("Delete this hall?")) {
                 cinemas = cinemas.filter(c => c.id !== id);
                 saveData();
                 render();
             }
         }
 
-        // --- Logic: Create Group ---
+        function deleteSelected() {
+            if (confirm(`Delete ${selectedCinemaIds.size} halls?`)) {
+                cinemas = cinemas.filter(c => !selectedCinemaIds.has(c.id));
+                selectedCinemaIds.clear();
+                saveData();
+                render();
+            }
+        }
+
+        // --- Group Logic ---
         function openGroupModal() {
             openModal('createGroupModal');
-            // Select first color by default
             selectColor('#3b82f6');
         }
 
         function submitNewGroup() {
             const c = getCurrentCinema();
             if (!c) return;
-
             const name = document.getElementById('newGroupName').value.trim() || 'Group ' + (c.groups.length + 1);
             const color = document.getElementById('selectedColorInput').value;
 
-            const newGroup = {
-                id: crypto.randomUUID(),
-                name: name,
-                color: color
-            };
-
+            const newGroup = { id: crypto.randomUUID(), name: name, color: color };
             c.groups.push(newGroup);
             saveData();
             closeModal('createGroupModal');
             document.getElementById('newGroupName').value = '';
-
-            // Determine behavior: auto select new group?
             currentTool = newGroup.id;
             renderCinemaView();
         }
 
-        // Color Picker Logic
         function selectColor(color) {
             document.getElementById('selectedColorInput').value = color;
-            // Visual Update
             document.querySelectorAll('.color-opt').forEach(btn => {
-                if (btn.dataset.color === color) {
-                    btn.classList.add('ring-white');
-                    btn.classList.remove('ring-transparent');
-                } else {
-                    btn.classList.remove('ring-white');
-                    btn.classList.add('ring-transparent');
+                btn.classList.toggle('ring-white', btn.dataset.color === color);
+                btn.classList.toggle('ring-transparent', btn.dataset.color !== color);
+            });
+            if (color.startsWith('#')) document.getElementById('customColor').value = color;
+        }
+
+        // --- PDF Logic ---
+        function exportSelectedPDF() {
+            const selectedCinemas = cinemas.filter(c => selectedCinemaIds.has(c.id));
+            if (selectedCinemas.length === 0) return;
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            selectedCinemas.forEach((c, index) => {
+                if (index > 0) doc.addPage();
+
+                // Title
+                doc.setFontSize(22);
+                doc.text(c.name, 14, 20);
+                doc.setFontSize(12);
+                doc.text(`Grid: ${c.rows}x${c.cols}`, 14, 28);
+
+                // Grid Visuals
+                const startY = 40;
+                const cellSize = 10;
+                const margin = 14;
+
+                // Check if grid fits width
+                const gridWidth = c.cols * cellSize;
+                const pageWidth = doc.internal.pageSize.getWidth();
+                // Simple scaling if too large
+                let effectiveCellSize = cellSize;
+                if (gridWidth > (pageWidth - 2 * margin)) {
+                    effectiveCellSize = (pageWidth - 2 * margin) / c.cols;
+                }
+
+                for (let r = 0; r < c.rows; r++) {
+                    for (let col = 0; col < c.cols; col++) {
+                        const seat = c.seats.find(s => s.row === r && s.col === col);
+                        const x = margin + (col * effectiveCellSize);
+                        const y = startY + (r * effectiveCellSize);
+
+                        // Draw Rect
+                        if (seat.status === 'reserved') {
+                            const group = c.groups.find(g => g.id === seat.groupId);
+                            doc.setFillColor(group ? group.color : '#aaaaaa');
+                            doc.rect(x, y, effectiveCellSize, effectiveCellSize, 'F');
+                            doc.setTextColor(255, 255, 255);
+                        } else {
+                            doc.setDrawColor(200, 200, 200);
+                            doc.rect(x, y, effectiveCellSize, effectiveCellSize, 'S');
+                            doc.setTextColor(150, 150, 150);
+                        }
+
+                        // Seat Number
+                        doc.setFontSize(effectiveCellSize * 0.4);
+                        doc.text(`${col + 1}`, x + effectiveCellSize / 2, y + effectiveCellSize / 2 + effectiveCellSize * 0.15, { align: 'center' });
+                    }
+                }
+
+                // Legend / Tables
+                const tableY = startY + (c.rows * effectiveCellSize) + 15;
+                const tableData = [];
+                c.groups.forEach(g => {
+                    const groupSeats = c.seats.filter(s => s.groupId === g.id && s.status === 'reserved');
+                    if (groupSeats.length > 0) {
+                        // Format range: (R1: 1, 2)
+                        const detail = groupSeats.map(s => `R${s.row + 1}-${s.col + 1}`).join(', ');
+                        tableData.push([g.name, groupSeats.length, detail]);
+                    }
+                });
+
+                if (tableData.length > 0) {
+                    doc.autoTable({
+                        startY: tableY,
+                        head: [['Group', 'Count', 'Seats']],
+                        body: tableData,
+                        headStyles: { fillColor: [40, 40, 40] }
+                    });
                 }
             });
-            // Also update custom picker if it matches
-            const cp = document.getElementById('customColor');
-            // If it's a hex from our list, update picker value
-            if (color.startsWith('#')) cp.value = color;
+
+            // EMBED DATA FOR RESTORE
+            // We append the JSON data as invisible text at the very bottom of the last page (or first).
+            // Format: DATA_START:base64:DATA_END
+            const fullJson = JSON.stringify(selectedCinemas);
+            // Escape unicode
+            const b64 = btoa(unescape(encodeURIComponent(fullJson)));
+            const payload = `DATA_START:${b64}:DATA_END`;
+
+            // Write invisibly (white text, tiny font)
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(1);
+            doc.text(payload, 0, doc.internal.pageSize.getHeight());
+
+            doc.save('cinema-export.pdf');
         }
 
-        // --- Sharing ---
-        elements.shareBtn.onclick = () => {
-            const c = getCurrentCinema();
-            if (!c) return;
+        // --- PDF Import Logic ---
+        async function handlePdfImport(input) {
+            const file = input.files[0];
+            if (!file) return;
 
-            // Encode current cinema
-            const jsonStr = JSON.stringify(c);
-            const base64 = btoa(unescape(encodeURIComponent(jsonStr)));
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-            const url = new URL(window.location.href);
-            url.searchParams.set('data', base64);
+                let foundData = false;
 
-            const shareUrl = url.toString();
+                // Check mostly last page or first page
+                const pagesToCheck = [pdf.numPages, 1];
 
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                showToast("Cinema link copied!");
-            }).catch(e => {
-                prompt("Copy link:", shareUrl);
-            });
-        };
+                for (let i of new Set(pagesToCheck)) {
+                    if (i < 1 || i > pdf.numPages) continue;
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const text = textContent.items.map(item => item.str).join('');
 
-        // --- Helpers ---
-        function getCurrentCinema() {
-            return cinemas.find(c => c.id === currentCinemaId);
+                    // Regex look for payload
+                    // Note: PDF text extraction often adds spaces or splits strings. 
+                    // However, since we wrote it as one single text call, it *should* be contiguous.
+                    // If split, we might need robust assembly.
+                    // Let's search loosely.
+                    const startMarker = "DATA_START:";
+                    const endMarker = ":DATA_END";
+
+                    const startIndex = text.indexOf(startMarker);
+                    const endIndex = text.indexOf(endMarker);
+
+                    if (startIndex !== -1 && endIndex !== -1) {
+                        const b64 = text.substring(startIndex + startMarker.length, endIndex);
+                        try {
+                            const jsonStr = decodeURIComponent(escape(atob(b64)));
+                            const importedCinemas = JSON.parse(jsonStr);
+
+                            let count = 0;
+                            importedCinemas.forEach(c => {
+                                // De-dupe ID
+                                c.id = crypto.randomUUID();
+                                c.name = c.name + " (From PDF)";
+                                cinemas.push(c);
+                                count++;
+                            });
+                            saveData();
+                            render();
+                            showToast(`Imported ${count} Halls`);
+                            foundData = true;
+                            break;
+                        } catch (e) {
+                            console.error("Parse error", e);
+                        }
+                    }
+                }
+
+                if (!foundData) {
+                    alert("No valid cinema data found in this PDF. Was it generated by Local Seat Manager?");
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Error reading PDF.");
+            }
+
+            input.value = ''; // Reset
         }
 
+        // --- Utils ---
+        function getCurrentCinema() { return cinemas.find(c => c.id === currentCinemaId); }
         function openModal(id) {
             const m = document.getElementById(id);
             m.classList.remove('opacity-0', 'pointer-events-none');
             m.querySelector('.transform').classList.remove('scale-95');
             m.querySelector('.transform').classList.add('scale-100');
         }
-
         function closeModal(id) {
             const m = document.getElementById(id);
             m.classList.add('opacity-0', 'pointer-events-none');
             m.querySelector('.transform').classList.remove('scale-100');
             m.querySelector('.transform').classList.add('scale-95');
         }
-
         function showToast(msg, isError) {
             elements.toastMsg.innerText = msg;
             elements.toast.classList.remove('opacity-0');
             if (isError) elements.toast.firstElementChild.className = "fas fa-exclamation-circle text-red-500";
             else elements.toast.firstElementChild.className = "fas fa-check-circle text-green-500";
-
-            setTimeout(() => {
-                elements.toast.classList.add('opacity-0');
-            }, 3000);
+            setTimeout(() => elements.toast.classList.add('opacity-0'), 3000);
         }
 
         // Init
