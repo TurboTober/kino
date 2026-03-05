@@ -1089,11 +1089,11 @@
 
                 // Controls
                 const controls = document.createElement('div');
-                controls.className = "flex flex-col gap-1 shrink-0 opacity-20 group-hover:opacity-100 transition-opacity absolute -left-10 bg-gray-800 p-1 rounded-md shadow-lg border border-gray-700 z-10";
+                controls.className = "flex flex-col gap-1 shrink-0 bg-gray-800 p-1 rounded-md shadow-lg border border-gray-700 z-10 w-8 items-center";
                 controls.innerHTML = `
                     <button onclick="moveScratchRow(${index}, -1)" class="text-gray-400 hover:text-white p-1 ${index === 0 ? 'invisible' : ''}"><i class="fas fa-chevron-up text-xs"></i></button>
                     <button onclick="moveScratchRow(${index}, 1)" class="text-gray-400 hover:text-white p-1 ${index === builderActiveTemplate.rowConfigs.length - 1 ? 'invisible' : ''}"><i class="fas fa-chevron-down text-xs"></i></button>
-                    <button onclick="removeScratchRow('${rConf.id}')" class="text-red-500 hover:text-red-400 p-1 mt-1 border-t border-gray-700"><i class="fas fa-trash text-xs"></i></button>
+                    <button onclick="removeScratchRow('${rConf.id}')" class="text-red-500 hover:text-red-400 p-1 mt-1 border-t border-gray-700 w-full"><i class="fas fa-trash text-xs"></i></button>
                 `;
                 rowEl.appendChild(controls);
 
