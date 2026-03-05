@@ -100,15 +100,20 @@
             <!-- Dashboard Actions -->
             <div id="dashboardActions" class="hidden flex gap-2">
                 <button onclick="document.getElementById('pdfImportInput').click()"
-                    class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold transition flex items-center gap-2 shadow-md"
+                    class="bg-gray-700 hover:bg-gray-600 text-white px-2 sm:px-3 py-1.5 rounded-full text-sm font-semibold transition flex items-center gap-2 shadow-md"
                     title="Import PDF">
-                    <i class="fas fa-file-import"></i> <span class="hidden sm:inline">Import PDF</span>
+                    <i class="fas fa-file-import"></i> <span class="hidden sm:inline">Import</span>
                 </button>
                 <input type="file" id="pdfImportInput" class="hidden" accept="application/pdf"
                     onchange="handlePdfImport(this)">
 
+                <button id="manageTemplatesBtn" onclick="openTemplatesModal()"
+                    class="bg-gray-700 hover:bg-gray-600 text-white px-2 sm:px-3 py-1.5 rounded-full text-sm font-semibold transition flex items-center gap-2 shadow-md">
+                    <i class="fas fa-layer-group"></i> <span class="hidden sm:inline">Templates</span>
+                </button>
+
                 <button id="createCinemaBtn"
-                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-full text-sm font-semibold transition flex items-center gap-2 shadow-md">
+                    class="bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1.5 rounded-full text-sm font-semibold transition flex items-center gap-2 shadow-md">
                     <i class="fas fa-plus"></i> <span class="hidden sm:inline">New Hall</span>
                 </button>
             </div>
@@ -199,7 +204,8 @@
     <div id="createCinemaModal"
         class="modal opacity-0 pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeModal('createCinemaModal')"></div>
-        <div class="relative bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl p-6 transform transition-all scale-95">
+        <div
+            class="relative bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl p-6 transform transition-all scale-95 max-h-[90vh] overflow-y-auto">
             <h3 class="text-xl font-bold mb-4">Create New Hall</h3>
             <div class="space-y-4">
                 <div>
@@ -208,18 +214,25 @@
                         class="w-full bg-gray-700 rounded p-2 focus:ring-2 focus:ring-red-500 outline-none"
                         placeholder="e.g. Hall 1">
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs uppercase text-gray-400 font-bold mb-1">Use Template (Optional)</label>
+                    <select id="newCinemaTemplate" onchange="toggleCinemaSizeInputs()"
+                        class="w-full bg-gray-700 rounded p-2 focus:ring-2 focus:ring-red-500 outline-none">
+                        <option value="">-- None (Custom Size) --</option>
+                    </select>
+                </div>
+                <div id="cinemaSizeInputs" class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs uppercase text-gray-400 font-bold mb-1">Rows</label>
                         <input type="number" id="newCinemaRows"
                             class="w-full bg-gray-700 rounded p-2 focus:ring-2 focus:ring-red-500 outline-none"
-                            value="6" min="1" max="20">
+                            value="6" min="1" max="50">
                     </div>
                     <div>
                         <label class="block text-xs uppercase text-gray-400 font-bold mb-1">Columns</label>
                         <input type="number" id="newCinemaCols"
                             class="w-full bg-gray-700 rounded p-2 focus:ring-2 focus:ring-red-500 outline-none"
-                            value="8" min="1" max="20">
+                            value="8" min="1" max="50">
                     </div>
                 </div>
             </div>
@@ -308,9 +321,158 @@
         </div>
     </div>
 
+    <!-- Templates Modal -->
+    <div id="templatesModal"
+        class="modal opacity-0 pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeModal('templatesModal')"></div>
+        <div
+            class="relative bg-gray-800 w-full max-w-2xl rounded-xl shadow-2xl p-6 transform transition-all scale-95 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 shrink-0">
+                <h3 class="text-xl font-bold">Manage Templates</h3>
+                <button onclick="closeModal('templatesModal')" class="text-gray-400 hover:text-white"><i
+                        class="fas fa-times text-xl"></i></button>
+            </div>
+
+            <!-- List of existing templates -->
+            <div class="flex-grow overflow-y-auto pr-2 mb-4 group-scroll">
+                <div id="templateList" class="space-y-3">
+                    <!-- Templates injected here -->
+                </div>
+                <div id="emptyTemplatesState" class="text-center text-gray-500 my-8 hidden">
+                    <i class="fas fa-shapes text-4xl mb-3 opacity-30"></i>
+                    <p>No templates yet.</p>
+                </div>
+            </div>
+
+            <!-- Create New Template Options -->
+            <div class="pt-4 border-t border-gray-700 shrink-0">
+                <p class="text-sm text-gray-400 mb-3 font-semibold text-center uppercase tracking-wide">Create New
+                    Template</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="startCreateTemplate('outline')"
+                        class="bg-gray-700 hover:bg-gray-600 p-3 rounded-lg flex flex-col items-center gap-2 transition border border-gray-600 hover:border-blue-500 group">
+                        <i
+                            class="fas fa-border-all text-2xl text-blue-400 group-hover:scale-110 transition-transform"></i>
+                        <div class="text-center">
+                            <span class="block font-bold mt-1">Rough Outline</span>
+                            <span class="text-xs text-gray-400">Grid based</span>
+                        </div>
+                    </button>
+                    <button onclick="startCreateTemplate('scratch')"
+                        class="bg-gray-700 hover:bg-gray-600 p-3 rounded-lg flex flex-col items-center gap-2 transition border border-gray-600 hover:border-green-500 group">
+                        <i class="fas fa-plus text-2xl text-green-400 group-hover:scale-110 transition-transform"></i>
+                        <div class="text-center">
+                            <span class="block font-bold mt-1">From Scratch</span>
+                            <span class="text-xs text-gray-400">Row by row</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Builder (Outline Mode) -->
+    <div id="outlineBuilderModal"
+        class="modal opacity-0 pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal('outlineBuilderModal')"></div>
+        <div
+            class="relative bg-gray-900 w-full max-w-4xl h-[90vh] flex flex-col rounded-xl shadow-2xl overflow-hidden transform transition-all scale-95 border border-gray-700">
+            <!-- Header -->
+            <div class="bg-gray-800 p-4 shrink-0 flex justify-between items-center border-b border-gray-700">
+                <div class="flex items-center gap-3">
+                    <button onclick="backToTemplates('outlineBuilderModal')" class="text-gray-400 hover:text-white"><i
+                            class="fas fa-arrow-left"></i></button>
+                    <h3 class="text-lg font-bold">Outline Builder</h3>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-sm"><span id="outlineSeatCount" class="font-bold text-blue-400">0</span> <span
+                            class="text-gray-400">Seats</span></div>
+                    <button onclick="saveTemplate('outline')"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-md">Save</button>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="bg-gray-800/80 p-3 shrink-0 flex gap-4 items-end border-b border-gray-700/50">
+                <div class="flex-grow max-w-xs">
+                    <label class="block text-xs uppercase text-gray-400 font-bold mb-1">Template Name</label>
+                    <input type="text" id="outlineTplName"
+                        class="w-full bg-gray-700 rounded px-2 py-1.5 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                        placeholder="e.g. Balcony Shape">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-gray-400 font-bold mb-1">Rows</label>
+                    <input type="number" id="outlineTplRows"
+                        class="w-16 bg-gray-700 rounded px-2 py-1.5 focus:ring-2 focus:ring-blue-500 outline-none text-sm text-center"
+                        value="10" min="1" max="50" onchange="generateOutlineGrid()">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-gray-400 font-bold mb-1">Cols</label>
+                    <input type="number" id="outlineTplCols"
+                        class="w-16 bg-gray-700 rounded px-2 py-1.5 focus:ring-2 focus:ring-blue-500 outline-none text-sm text-center"
+                        value="15" min="1" max="50" onchange="generateOutlineGrid()">
+                </div>
+                <div class="text-xs text-gray-500 italic pb-1 ml-auto hidden sm:block">Click seats to remove/add them.
+                </div>
+            </div>
+
+            <!-- Grid Area -->
+            <div class="flex-grow overflow-auto p-4 flex justify-center items-start">
+                <div id="outlineGrid" class="grid gap-1 auto-rows-min min-w-max">
+                    <!-- Outline Grid injected -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Builder (Scratch Mode) -->
+    <div id="scratchBuilderModal"
+        class="modal opacity-0 pointer-events-none fixed inset-0 z-[60] flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal('scratchBuilderModal')"></div>
+        <div
+            class="relative bg-gray-900 w-full max-w-4xl h-[90vh] flex flex-col rounded-xl shadow-2xl overflow-hidden transform transition-all scale-95 border border-gray-700">
+            <!-- Header -->
+            <div class="bg-gray-800 p-4 shrink-0 flex justify-between items-center border-b border-gray-700">
+                <div class="flex items-center gap-3">
+                    <button onclick="backToTemplates('scratchBuilderModal')" class="text-gray-400 hover:text-white"><i
+                            class="fas fa-arrow-left"></i></button>
+                    <h3 class="text-lg font-bold">Scratch Builder</h3>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-sm"><span id="scratchSeatCount" class="font-bold text-green-400">0</span> <span
+                            class="text-gray-400">Seats</span></div>
+                    <button onclick="saveTemplate('scratch')"
+                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-md">Save</button>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="bg-gray-800/80 p-3 shrink-0 flex gap-4 items-end border-b border-gray-700/50">
+                <div class="flex-grow max-w-xs">
+                    <label class="block text-xs uppercase text-gray-400 font-bold mb-1">Template Name</label>
+                    <input type="text" id="scratchTplName"
+                        class="w-full bg-gray-700 rounded px-2 py-1.5 focus:ring-2 focus:ring-green-500 outline-none text-sm"
+                        placeholder="e.g. Asymmetric Layout">
+                </div>
+                <button onclick="addScratchRow()"
+                    class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm flex items-center gap-2 border border-gray-600 ml-auto">
+                    <i class="fas fa-plus"></i> New Row
+                </button>
+            </div>
+
+            <!-- Workspace Area -->
+            <div class="flex-grow overflow-auto p-4 group-scroll">
+                <div class="cinema-screen mb-8"></div>
+                <div id="scratchWorkspace" class="flex flex-col gap-3 min-w-max items-center pb-20">
+                    <!-- Scratch Rows injected -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast"
-        class="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 border-l-4 border-green-500 text-white px-6 py-3 rounded shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50 flex items-center gap-3">
+        class="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 border-l-4 border-green-500 text-white px-6 py-3 rounded shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-[100] flex items-center gap-3">
         <i class="fas fa-check-circle text-green-500"></i>
         <span id="toastMsg">Action Successful</span>
     </div>
@@ -318,17 +480,25 @@
     <script>
         /**
          * Schema Reference:
-         * Cinema: { id: string, name: string, rows: number, cols: number, groups: Group[], seats: Seat[] }
+         * Cinema: { id: string, name: string, rows: number, cols: number, groups: Group[], seats: Seat[], templateId?: string }
+         * Seat: { row: number, col: number, displayRow: string/number, displayCol: string/number, status: string, groupId: string|null, active: boolean, x?: number } 
+         *  - active: false means not part of the physical layout (e.g. deselected in outline, or empty space)
+         * Template: { id: string, name: string, type: 'outline' | 'scratch', seatCount: number, seats: Seat[], rows?: number, cols?: number, rowConfigs?: any[] }
          */
 
         const STORAGE_KEY = 'cinemaMgr_v2';
+        const STORAGE_KEY_TEMPLATES = 'cinemaMgr_templates_v1';
 
         // --- State ---
         let cinemas = [];
+        let templates = [];
         let currentCinemaId = null;
         let pendedImport = null;
         let currentTool = 'eraser';
         let selectedCinemaIds = new Set(); // For dashboard multi-select
+
+        // Active builder states
+        let builderActiveTemplate = null;
 
         // --- DOM Elements ---
         const views = {
@@ -376,14 +546,34 @@
             if (raw) {
                 try {
                     cinemas = JSON.parse(raw);
+                    // Migration: ensure all seats have active flag
+                    cinemas.forEach(c => {
+                        if (c.seats) {
+                            c.seats.forEach(s => {
+                                if (s.active === undefined) s.active = true;
+                                if (s.displayRow === undefined) s.displayRow = s.row + 1;
+                                if (s.displayCol === undefined) s.displayCol = s.col + 1;
+                            });
+                        }
+                    });
                 } catch (e) {
                     cinemas = [];
+                }
+            }
+
+            const rawTpl = localStorage.getItem(STORAGE_KEY_TEMPLATES);
+            if (rawTpl) {
+                try {
+                    templates = JSON.parse(rawTpl);
+                } catch (e) {
+                    templates = [];
                 }
             }
         }
 
         function saveData() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(cinemas));
+            localStorage.setItem(STORAGE_KEY_TEMPLATES, JSON.stringify(templates));
         }
 
         function handleExternalImport(cinemaData) {
@@ -557,26 +747,36 @@
 
                 for (let col = 0; col < c.cols; col++) {
                     // Find seat
-                    const seatIndex = r * c.cols + col; // Assuming linear array
-                    // Check if seat array is linear or we need to find by row/col
-                    // My previous implementation was linear but ordered.
                     const seat = c.seats.find(s => s.row === r && s.col === col);
 
+                    if (!seat) {
+                        // In scratch builder you might have literal gaps, but we rely on active flag
+                        const emptyDiv = document.createElement('div');
+                        elements.seatGrid.appendChild(emptyDiv);
+                        continue;
+                    }
+
+                    if (!seat.active) {
+                        const emptyDiv = document.createElement('div');
+                        elements.seatGrid.appendChild(emptyDiv);
+                        continue;
+                    }
+
                     const btn = document.createElement('button');
-                    let classes = "w-8 h-8 sm:w-10 sm:h-10 rounded md:rounded-lg flex items-center justify-center text-xs sm:text-sm font-bold transition transform active:scale-95 focus:outline-none relative ";
+                    let classes = "w-8 h-8 sm:w-10 sm:h-10 rounded md:rounded-lg flex items-center justify-center text-xs sm:text-sm font-bold transition transform active:scale-95 focus:outline-none relative shadow-sm ";
 
                     if (seat.status === 'available') {
-                        classes += "bg-gray-700 text-gray-500 hover:bg-gray-600 hover:text-gray-300";
+                        classes += "bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 hover:text-white";
                     } else {
                         const group = c.groups.find(g => g.id === seat.groupId);
                         const color = group ? group.color : '#ef4444';
-                        btn.style.backgroundColor = `${color}33`;
+                        btn.style.backgroundColor = `${color}33`; // 20% opacity background
                         btn.style.color = color;
                         btn.style.border = `1px solid ${color}`;
                     }
 
                     btn.className = classes;
-                    btn.innerText = col + 1; // Seat Number
+                    btn.innerText = seat.displayCol; // Dynamically computed Seat Number
                     btn.onclick = () => handleSeatInteract(seat);
                     elements.seatGrid.appendChild(btn);
                 }
@@ -611,18 +811,420 @@
             }
         }
 
-        // --- CRUD Logic ---
+        // --- Template Logic ---
+        function openTemplatesModal() {
+            renderTemplatesList();
+            openModal('templatesModal');
+        }
+
+        function renderTemplatesList() {
+            const list = document.getElementById('templateList');
+            const emptyState = document.getElementById('emptyTemplatesState');
+            list.innerHTML = '';
+
+            if (templates.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                templates.forEach(t => {
+                    const el = document.createElement('div');
+                    el.className = "bg-gray-700 p-3 rounded-lg flex justify-between items-center border border-gray-600 hover:border-gray-500 transition group";
+                    el.innerHTML = `
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <i class="${t.type === 'outline' ? 'fas fa-border-all text-blue-400' : 'fas fa-bars text-green-400'} text-xl shrink-0 opacity-70"></i>
+                            <div class="min-w-0">
+                                <h4 class="font-bold text-sm truncate">${t.name}</h4>
+                                <p class="text-xs text-gray-400">${t.seatCount} Seats &bull; ${t.type === 'outline' ? 'Outline' : 'Scratch'}</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 shrink-0 ml-2">
+                            <button onclick="editTemplate('${t.id}')" class="text-gray-400 hover:text-white px-2 py-1"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteTemplate('${t.id}')" class="text-gray-400 hover:text-red-500 px-2 py-1"><i class="fas fa-trash"></i></button>
+                        </div>
+                    `;
+                    list.appendChild(el);
+                });
+            }
+        }
+
+        function deleteTemplate(id) {
+            if (confirm("Delete this template?")) {
+                templates = templates.filter(t => t.id !== id);
+                saveData();
+                renderTemplatesList();
+            }
+        }
+
+        function startCreateTemplate(type) {
+            closeModal('templatesModal');
+            builderActiveTemplate = {
+                id: crypto.randomUUID(),
+                type: type,
+                name: '',
+                seatCount: 0,
+                seats: [],
+                rows: type === 'outline' ? 10 : 0,
+                cols: type === 'outline' ? 15 : 0,
+                rowConfigs: []
+            };
+
+            if (type === 'outline') {
+                document.getElementById('outlineTplName').value = '';
+                document.getElementById('outlineTplRows').value = 10;
+                document.getElementById('outlineTplCols').value = 15;
+                generateOutlineGrid();
+                openModal('outlineBuilderModal');
+            } else {
+                document.getElementById('scratchTplName').value = '';
+                generateScratchWorkspace();
+                openModal('scratchBuilderModal');
+            }
+        }
+
+        function editTemplate(id) {
+            const t = templates.find(x => x.id === id);
+            if (!t) return;
+
+            closeModal('templatesModal');
+            // Create a deep copy for editing
+            builderActiveTemplate = JSON.parse(JSON.stringify(t));
+
+            if (t.type === 'outline') {
+                document.getElementById('outlineTplName').value = t.name;
+                document.getElementById('outlineTplRows').value = t.rows;
+                document.getElementById('outlineTplCols').value = t.cols;
+                renderOutlineGridFromState();
+                openModal('outlineBuilderModal');
+            } else {
+                document.getElementById('scratchTplName').value = t.name;
+                renderScratchWorkspaceFromState();
+                openModal('scratchBuilderModal');
+            }
+        }
+
+        function backToTemplates(currentModal) {
+            closeModal(currentModal);
+            builderActiveTemplate = null;
+            openTemplatesModal();
+        }
+
+        // --- Outline Builder Logic ---
+        function generateOutlineGrid() {
+            const rows = parseInt(document.getElementById('outlineTplRows').value) || 10;
+            const cols = parseInt(document.getElementById('outlineTplCols').value) || 15;
+
+            builderActiveTemplate.rows = rows;
+            builderActiveTemplate.cols = cols;
+            builderActiveTemplate.seats = [];
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    builderActiveTemplate.seats.push({
+                        row: r, col: c, active: true, displayRow: r + 1, displayCol: c + 1
+                    });
+                }
+            }
+            recalculateOutlineNumbers();
+            renderOutlineGridFromState();
+        }
+
+        function recalculateOutlineNumbers() {
+            builderActiveTemplate.seatCount = 0;
+
+            // Recalculate display numbers based on active seats
+            let actualRow = 1;
+
+            // Re-sort seats just in case
+            builderActiveTemplate.seats.sort((a, b) => a.row !== b.row ? a.row - b.row : a.col - b.col);
+
+            const rowMap = new Map();
+
+            builderActiveTemplate.seats.forEach(s => {
+                if (!rowMap.has(s.row)) rowMap.set(s.row, []);
+                rowMap.get(s.row).push(s);
+            });
+
+            Array.from(rowMap.keys()).sort((a, b) => a - b).forEach(rIdx => {
+                const rowSeats = rowMap.get(rIdx);
+                const hasActive = rowSeats.some(s => s.active);
+
+                if (hasActive) {
+                    let actualCol = 1;
+                    rowSeats.forEach(s => {
+                        if (s.active) {
+                            s.displayRow = actualRow;
+                            s.displayCol = actualCol++;
+                            builderActiveTemplate.seatCount++;
+                        }
+                    });
+                    actualRow++;
+                }
+            });
+
+            document.getElementById('outlineSeatCount').innerText = builderActiveTemplate.seatCount;
+        }
+
+        function toggleOutlineSeat(r, c) {
+            const seat = builderActiveTemplate.seats.find(s => s.row === r && s.col === c);
+            if (seat) {
+                seat.active = !seat.active;
+                recalculateOutlineNumbers();
+                renderOutlineGridFromState(); // Optimization: could just update the DOM nodes
+            }
+        }
+
+        function renderOutlineGridFromState() {
+            const grid = document.getElementById('outlineGrid');
+            grid.innerHTML = '';
+
+            const rows = builderActiveTemplate.rows;
+            const cols = builderActiveTemplate.cols;
+
+            grid.style.gridTemplateColumns = `auto repeat(${cols}, minmax(0, 1fr))`;
+
+            for (let r = 0; r < rows; r++) {
+                // Determine if row has active seats to show label
+                const rowSeats = builderActiveTemplate.seats.filter(s => s.row === r);
+                const activeSeat = rowSeats.find(s => s.active);
+
+                const label = document.createElement('div');
+                label.className = "flex items-center justify-center font-bold text-gray-500 text-xs pr-2 w-6";
+                label.innerText = activeSeat ? activeSeat.displayRow : '';
+                grid.appendChild(label);
+
+                for (let c = 0; c < cols; c++) {
+                    const seat = rowSeats.find(s => s.col === c);
+
+                    const btn = document.createElement('button');
+                    btn.className = `w-7 h-7 sm:w-8 sm:h-8 rounded flex items-center justify-center text-xs font-bold transition transform active:scale-95 focus:outline-none border ${seat.active ? 'bg-blue-600/20 text-blue-400 border-blue-500 hover:bg-blue-600/40' : 'bg-gray-800 text-gray-600 border-gray-700 hover:bg-gray-700'}`;
+                    btn.innerText = seat.active ? seat.displayCol : '';
+                    btn.onclick = () => toggleOutlineSeat(r, c);
+                    grid.appendChild(btn);
+                }
+            }
+        }
+
+        // --- Scratch Builder Logic ---
+        function generateScratchWorkspace() {
+            builderActiveTemplate.rowConfigs = [];
+            builderActiveTemplate.seats = [];
+            builderActiveTemplate.seatCount = 0;
+            renderScratchWorkspaceFromState();
+        }
+
+        function addScratchRow() {
+            const count = parseInt(prompt("How many seats in this row?", "10"));
+            if (isNaN(count) || count <= 0) return;
+
+            const rowId = crypto.randomUUID();
+            builderActiveTemplate.rowConfigs.push({ id: rowId, seatCount: count });
+            rebuildScratchSeats();
+        }
+
+        function removeScratchRow(rowId) {
+            builderActiveTemplate.rowConfigs = builderActiveTemplate.rowConfigs.filter(r => r.id !== rowId);
+            rebuildScratchSeats();
+        }
+
+        function moveScratchRow(index, direction) {
+            if (index + direction < 0 || index + direction >= builderActiveTemplate.rowConfigs.length) return;
+            const temp = builderActiveTemplate.rowConfigs[index];
+            builderActiveTemplate.rowConfigs[index] = builderActiveTemplate.rowConfigs[index + direction];
+            builderActiveTemplate.rowConfigs[index + direction] = temp;
+            rebuildScratchSeats();
+        }
+
+        function addSeatToScratchRow(rowId) {
+            const r = builderActiveTemplate.rowConfigs.find(x => x.id === rowId);
+            if (r) {
+                r.seatCount++;
+                rebuildScratchSeats();
+            }
+        }
+
+        function removeSeatFromScratchRow(rowId) {
+            const r = builderActiveTemplate.rowConfigs.find(x => x.id === rowId);
+            if (r && r.seatCount > 1) {
+                r.seatCount--;
+                rebuildScratchSeats();
+            }
+        }
+
+        function rebuildScratchSeats() {
+            builderActiveTemplate.seats = [];
+            builderActiveTemplate.seatCount = 0;
+            builderActiveTemplate.rows = builderActiveTemplate.rowConfigs.length;
+            builderActiveTemplate.cols = 0;
+
+            builderActiveTemplate.rowConfigs.forEach((rConf, index) => {
+                if (rConf.seatCount > builderActiveTemplate.cols) builderActiveTemplate.cols = rConf.seatCount;
+
+                for (let c = 0; c < rConf.seatCount; c++) {
+                    builderActiveTemplate.seats.push({
+                        row: index,
+                        col: c,
+                        active: true,
+                        displayRow: index + 1,
+                        displayCol: c + 1
+                    });
+                    builderActiveTemplate.seatCount++;
+                }
+            });
+
+            document.getElementById('scratchSeatCount').innerText = builderActiveTemplate.seatCount;
+            renderScratchWorkspaceFromState();
+        }
+
+        function renderScratchWorkspaceFromState() {
+            const ws = document.getElementById('scratchWorkspace');
+            ws.innerHTML = '';
+
+            document.getElementById('scratchSeatCount').innerText = builderActiveTemplate.seatCount;
+
+            builderActiveTemplate.rowConfigs.forEach((rConf, index) => {
+                const rowSeats = builderActiveTemplate.seats.filter(s => s.row === index);
+
+                const rowEl = document.createElement('div');
+                rowEl.className = "flex items-center gap-3 bg-gray-800/50 p-2 rounded-lg border border-gray-700 w-full max-w-5xl group relative";
+
+                // Controls
+                const controls = document.createElement('div');
+                controls.className = "flex flex-col gap-1 shrink-0 opacity-20 group-hover:opacity-100 transition-opacity absolute -left-10 bg-gray-800 p-1 rounded-md shadow-lg border border-gray-700 z-10";
+                controls.innerHTML = `
+                    <button onclick="moveScratchRow(${index}, -1)" class="text-gray-400 hover:text-white p-1 ${index === 0 ? 'invisible' : ''}"><i class="fas fa-chevron-up text-xs"></i></button>
+                    <button onclick="moveScratchRow(${index}, 1)" class="text-gray-400 hover:text-white p-1 ${index === builderActiveTemplate.rowConfigs.length - 1 ? 'invisible' : ''}"><i class="fas fa-chevron-down text-xs"></i></button>
+                    <button onclick="removeScratchRow('${rConf.id}')" class="text-red-500 hover:text-red-400 p-1 mt-1 border-t border-gray-700"><i class="fas fa-trash text-xs"></i></button>
+                `;
+                rowEl.appendChild(controls);
+
+                // Row Label
+                const label = document.createElement('div');
+                label.className = "w-6 text-center font-bold text-gray-500 text-sm shrink-0 border-r border-gray-600 pr-2";
+                label.innerText = index + 1;
+                rowEl.appendChild(label);
+
+                // Seats Container
+                const seatsContainer = document.createElement('div');
+                seatsContainer.className = "flex gap-1 flex-wrap justify-center flex-grow";
+
+                rowSeats.forEach(seat => {
+                    const btn = document.createElement('div');
+                    btn.className = "w-7 h-7 sm:w-8 sm:h-8 rounded flex items-center justify-center text-xs font-bold bg-green-600/20 text-green-400 border border-green-500 cursor-default select-none shadow-sm";
+                    btn.innerText = seat.displayCol;
+                    seatsContainer.appendChild(btn);
+                });
+                rowEl.appendChild(seatsContainer);
+
+                // Add/Remove Seat buttons
+                const seatControls = document.createElement('div');
+                seatControls.className = "flex flex-col gap-1 shrink-0 border-l border-gray-600 pl-2";
+                seatControls.innerHTML = `
+                    <button onclick="addSeatToScratchRow('${rConf.id}')" class="text-gray-400 hover:text-green-400 border border-transparent hover:border-gray-600 rounded px-1.5 leading-none h-5 flex items-center justify-center bg-gray-700"><i class="fas fa-plus text-[10px]"></i></button>
+                    <button onclick="removeSeatFromScratchRow('${rConf.id}')" class="text-gray-400 hover:text-red-400 border border-transparent hover:border-gray-600 rounded px-1.5 leading-none h-5 flex items-center justify-center bg-gray-700"><i class="fas fa-minus text-[10px]"></i></button>
+                `;
+                rowEl.appendChild(seatControls);
+
+                ws.appendChild(rowEl);
+            });
+
+            if (builderActiveTemplate.rowConfigs.length === 0) {
+                ws.innerHTML = `<div class="text-center text-gray-500 mt-10 w-full"><i class="fas fa-arrow-up text-2xl mb-2 animate-bounce"></i><p>Click "New Row" to start</p></div>`;
+            }
+        }
+
+        function saveTemplate(type) {
+            const nameInput = document.getElementById(type === 'outline' ? 'outlineTplName' : 'scratchTplName');
+            const name = nameInput.value.trim();
+            if (!name) {
+                alert("Please enter a template name.");
+                nameInput.focus();
+                return;
+            }
+
+            if (builderActiveTemplate.seatCount === 0) {
+                alert("Template must have at least one active seat.");
+                return;
+            }
+
+            builderActiveTemplate.name = name;
+
+            const existingIndex = templates.findIndex(t => t.id === builderActiveTemplate.id);
+            if (existingIndex >= 0) {
+                templates[existingIndex] = builderActiveTemplate;
+            } else {
+                templates.push(builderActiveTemplate);
+            }
+
+            saveData();
+            showToast("Template Saved");
+            backToTemplates(type === 'outline' ? 'outlineBuilderModal' : 'scratchBuilderModal');
+            populateTemplateDropdown();
+        }
+
+        // --- Create Cinema Hooks ---
+        function populateTemplateDropdown() {
+            const select = document.getElementById('newCinemaTemplate');
+            select.innerHTML = '<option value="">-- None (Custom Size) --</option>';
+            templates.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.innerText = `${t.name} (${t.seatCount} seats)`;
+                select.appendChild(opt);
+            });
+        }
+
+        function toggleCinemaSizeInputs() {
+            const select = document.getElementById('newCinemaTemplate');
+            const hasTemplate = select.value !== "";
+            const sizeInputs = document.getElementById('cinemaSizeInputs');
+            if (hasTemplate) {
+                sizeInputs.classList.add('opacity-50', 'pointer-events-none');
+            } else {
+                sizeInputs.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        }
+
+        // Hooks into existing openModal for createCinemaModal
+        const originalOpenModal = openModal;
+        openModal = function (id) {
+            if (id === 'createCinemaModal') {
+                populateTemplateDropdown();
+                toggleCinemaSizeInputs();
+            }
+            originalOpenModal(id);
+        }
+
+        // --- CRUD Logic OVERRIDE ---
+        // (Re-defined to support templates)
         elements.createCinemaBtn.onclick = () => openModal('createCinemaModal');
 
         function submitNewCinema() {
             const name = document.getElementById('newCinemaName').value.trim() || 'New Hall';
-            let rows = parseInt(document.getElementById('newCinemaRows').value) || 6;
-            let cols = parseInt(document.getElementById('newCinemaCols').value) || 8;
+            const templateId = document.getElementById('newCinemaTemplate').value;
 
-            const seats = [];
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    seats.push({ row: r, col: c, status: 'available', groupId: null, guestName: '' });
+            let rows, cols, seats = [];
+
+            if (templateId) {
+                const tpl = templates.find(t => t.id === templateId);
+                if (!tpl) return;
+
+                rows = tpl.rows;
+                cols = tpl.cols;
+
+                // Deep copy structure
+                seats = JSON.parse(JSON.stringify(tpl.seats)).map(s => {
+                    s.status = s.active ? 'available' : 'hidden'; // Ensure hidden seats can't be clicked simply
+                    s.groupId = null;
+                    s.guestName = '';
+                    return s;
+                });
+            } else {
+                rows = parseInt(document.getElementById('newCinemaRows').value) || 6;
+                cols = parseInt(document.getElementById('newCinemaCols').value) || 8;
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        seats.push({ row: r, col: c, status: 'available', groupId: null, guestName: '', active: true, displayRow: r + 1, displayCol: c + 1 });
+                    }
                 }
             }
 
@@ -631,6 +1233,7 @@
                 name: name,
                 rows: rows,
                 cols: cols,
+                templateId: templateId || null,
                 groups: [{ id: crypto.randomUUID(), name: 'General', color: '#ef4444' }],
                 seats: seats
             };
@@ -639,8 +1242,8 @@
             saveData();
             closeModal('createCinemaModal');
             document.getElementById('newCinemaName').value = '';
+            document.getElementById('newCinemaTemplate').value = '';
 
-            // Go to it
             currentCinemaId = newCinema.id;
             currentTool = newCinema.groups[0].id;
             render();
@@ -779,6 +1382,8 @@
                         const x = margin + (col * effectiveCellSize);
                         const y = startY + (r * effectiveCellSize);
 
+                        if (!seat || !seat.active) return; // Skip inactive/empty seats
+
                         // Draw Rect
                         if (seat.status === 'reserved') {
                             const group = c.groups.find(g => g.id === seat.groupId);
@@ -793,7 +1398,7 @@
 
                         // Seat Number
                         doc.setFontSize(effectiveCellSize * 0.4);
-                        doc.text(`${col + 1}`, x + effectiveCellSize / 2, y + effectiveCellSize / 2 + effectiveCellSize * 0.15, { align: 'center' });
+                        doc.text(`${seat.displayCol}`, x + effectiveCellSize / 2, y + effectiveCellSize / 2 + effectiveCellSize * 0.15, { align: 'center' });
                     }
                 }
 
@@ -821,8 +1426,12 @@
 
             // EMBED DATA AS METADATA
             // We store the data in the 'Subject' field of the PDF metadata.
-            // This is cleaner and more reliable than hidden text.
-            const fullJson = JSON.stringify(selectedCinemas);
+            const exportPayload = {
+                cinemas: selectedCinemas,
+                templates: templates // Export all templates implicitly
+            };
+
+            const fullJson = JSON.stringify(exportPayload);
             const b64 = btoa(unescape(encodeURIComponent(fullJson)));
             const payload = `DATA_START:${b64}:DATA_END`;
 
@@ -865,26 +1474,46 @@
                     const b64 = payload.substring(startIndex + startMarker.length, endIndex);
                     try {
                         const jsonStr = decodeURIComponent(escape(atob(b64)));
-                        const importedCinemas = JSON.parse(jsonStr);
+                        const parsedData = JSON.parse(jsonStr);
 
-                        let count = 0;
+                        let importedCinemas = [];
+                        let importedTemplates = [];
+
+                        // Handle v2 format vs Legacy (Array) format
+                        if (Array.isArray(parsedData)) {
+                            importedCinemas = parsedData;
+                        } else {
+                            importedCinemas = parsedData.cinemas || [];
+                            importedTemplates = parsedData.templates || [];
+                        }
+
+                        let hallCount = 0;
                         importedCinemas.forEach(c => {
                             c.id = crypto.randomUUID();
                             c.name = c.name + " (Import)";
                             cinemas.push(c);
-                            count++;
+                            hallCount++;
                         });
+
+                        let tplCount = 0;
+                        importedTemplates.forEach(t => {
+                            // Check if template exists by ID or name to prevent exact duplicates
+                            const exists = templates.some(existing => existing.id === t.id);
+                            if (!exists) {
+                                templates.push(t);
+                                tplCount++;
+                            }
+                        });
+
                         saveData();
                         render();
-                        showToast(`Imported ${count} Halls`);
+                        showToast(`Imported ${hallCount} Halls & ${tplCount} Templates`);
                         return; // Success
                     } catch (e) {
                         console.error("Parse error", e);
                         alert("Data corrupted in PDF.");
                     }
                 } else {
-                    // Fallback to text extraction (Legacy support for v4.0 if we care, or just for safety)
-                    // ... (Original logic could remain here, but let's assume metadata is the way forward)
                     alert("No cinema data found in this PDF metadata.");
                 }
 
